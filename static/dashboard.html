@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HTTP IoT Dashboard — Atividade Interativa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:       #06090f;
+    --surface:  #0e141f;
+    --surface2: #141c2b;
+    --border:   #1f2a3c;
+    --text:     #e8eef7;
+    --muted:    #8595ab;
+    --faint:    #5a6b82;
+    --accent:   #3b82f6;
+    --accent2:  #1d4ed8;
+    --payload:  #64748b;
+    --ok:       #22c55e;
+    --warn:     #f97316;
+    --radius:   16px;
+    --mono:     'Fira Code', ui-monospace, monospace;
+    --sans:     'Fira Sans', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background:
+      radial-gradient(1200px 700px at 70% -5%, rgba(59,130,246,.13), transparent 60%),
+      radial-gradient(900px 600px at -5% 120%, rgba(59,130,246,.07), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.5;
+    min-height: 100dvh;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  /* ── Header ─────────────────────────────── */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 32px; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 46px; height: 46px; border-radius: 13px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    display: grid; place-items: center;
+    box-shadow: 0 0 28px rgba(59,130,246,.35);
+  }
+  .brand h1 { font-size: 1.18rem; font-weight: 700; letter-spacing: .2px; }
+  .brand p  { font-size: .8rem; color: var(--muted); margin-top: 1px; }
+  .status { display: flex; align-items: center; gap: 10px; font-size: .82rem; color: var(--muted); font-family: var(--mono); }
+  .pulse {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--ok); box-shadow: 0 0 10px var(--ok);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .pulse.off { background: var(--faint); box-shadow: none; animation: none; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+  /* ── Seção genérica ─────────────────────── */
+  .section { background: linear-gradient(180deg, var(--surface2), var(--surface)); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+  .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .section-head h2 { font-size: .95rem; font-weight: 600; }
+  .section-head h2 span { color: var(--muted); font-weight: 400; }
+  .tag { font-family: var(--mono); font-size: .7rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+
+  /* ── Stats rápidos ──────────────────────── */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  @media (max-width: 700px) { .stats-row { grid-template-columns: 1fr 1fr; } }
+  .stat-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .stat-box .sk { font-size: .73rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .stat-box .sv { font-family: var(--mono); font-size: 1.65rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat-box .sv u { text-decoration: none; font-size: .75rem; color: var(--faint); margin-left: 3px; }
+  .stat-box.accent { border-color: rgba(59,130,246,.3); background: rgba(59,130,246,.05); }
+  .stat-box.accent .sv { color: var(--accent); }
+
+  /* ── Sensor readings ────────────────────── */
+  .readings { display: flex; gap: 14px; margin-bottom: 18px; }
+  .reading { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 13px; padding: 16px; }
+  .reading .rk { font-size: .73rem; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+  .reading .rv { font-family: var(--mono); font-size: 2rem; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .reading .rv u { text-decoration: none; font-size: .85rem; color: var(--faint); margin-left: 2px; }
+
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; font-size: .8rem; }
+  .meta div { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border); padding-bottom: 7px; }
+  .meta span:first-child { color: var(--muted); }
+  .meta span:last-child { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .empty { color: var(--faint); font-style: italic; font-size: .85rem; }
+
+  /* ── Anatomia da mensagem HTTP ──────────── */
+  .anatomy { display: flex; flex-direction: column; gap: 16px; }
+  .bar-label { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+  .bar-label strong { color: var(--text); }
+  .track {
+    height: 38px; border-radius: 10px; background: #070c14;
+    overflow: hidden; display: flex; border: 1px solid var(--border);
+  }
+  .seg { height: 100%; transition: width .5s cubic-bezier(.2,.7,.2,1); }
+  .seg.payload {
+    background: repeating-linear-gradient(45deg, var(--payload), var(--payload) 6px, #55657c 6px, #55657c 12px);
+  }
+  .seg.overhead {
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+  }
+  .bar-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px; font-size: .76rem; color: var(--muted); font-family: var(--mono); }
+  .bar-meta i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  /* ── Anatomia da requisição (código) ────── */
+  .req-block {
+    background: #070c14; border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; font-family: var(--mono); font-size: .8rem; line-height: 1.75;
+    overflow-x: auto;
+  }
+  .req-block .method  { color: var(--accent); font-weight: 700; }
+  .req-block .path    { color: var(--text); }
+  .req-block .version { color: var(--faint); }
+  .req-block .hkey    { color: #94a3b8; }
+  .req-block .hval    { color: #e2e8f0; }
+  .req-block .body    { color: var(--ok); }
+  .req-block .comment { color: var(--faint); font-style: italic; }
+  .tag-200 { background: rgba(34,197,94,.12); color: var(--ok); border: 1px solid rgba(34,197,94,.25); font-family: var(--mono); font-size: .72rem; padding: 3px 9px; border-radius: 999px; }
+
+  /* ── Gráfico SVG ────────────────────────── */
+  .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .chart-head h2 { font-size: .95rem; font-weight: 600; }
+  .chart-head h2 span { color: var(--muted); font-weight: 400; }
+  .segmented { display: inline-flex; background: #0a1018; border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
+  .segmented button {
+    font-family: var(--mono); font-size: .73rem; color: var(--muted); background: transparent;
+    border: 0; border-radius: 8px; padding: 7px 12px; cursor: pointer;
+    transition: color .2s, background .2s; white-space: nowrap;
+  }
+  .segmented button:hover { color: var(--text); }
+  .segmented button[aria-pressed="true"] { color: var(--text); background: var(--surface2); box-shadow: inset 0 0 0 1px var(--border); }
+  .chart-wrap { position: relative; }
+  .chart-svg { width: 100%; height: 200px; display: block; }
+  .chart-svg text { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .chart-legend { display: flex; gap: 8px 20px; flex-wrap: wrap; margin-top: 14px; font-size: .77rem; font-family: var(--mono); color: var(--muted); }
+  .chart-legend .li { display: inline-flex; align-items: center; gap: 8px; }
+  .chart-legend .swatch { width: 22px; height: 0; border-top-width: 3px; border-top-style: solid; border-radius: 2px; }
+  .chart-legend b { color: var(--text); }
+  .chart-empty { color: var(--faint); font-style: italic; font-size: .85rem; padding: 40px 0; text-align: center; }
+  .chart-tip {
+    position: absolute; pointer-events: none;
+    background: #0a1018; border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 12px; font-family: var(--mono); font-size: .72rem; line-height: 1.6;
+    color: var(--text); white-space: nowrap;
+    transform: translate(-50%, calc(-100% - 12px));
+    opacity: 0; transition: opacity .12s; z-index: 5;
+    box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  }
+
+  /* ── Endpoints table ────────────────────── */
+  .ep-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+  .ep-table th { text-align: left; color: var(--muted); font-weight: 500; font-size: .71rem; padding: 6px 12px; border-bottom: 1px solid var(--border); }
+  .ep-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .ep-table tr:last-child td { border-bottom: none; }
+  .ep-table .method-pill { font-family: var(--mono); font-size: .7rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+  .pill-post { background: rgba(59,130,246,.15); color: var(--accent); }
+  .pill-get  { background: rgba(34,197,94,.12); color: var(--ok); }
+  .ep-path { font-family: var(--mono); font-size: .82rem; }
+  .ep-desc { font-size: .8rem; color: var(--muted); }
+  .ep-status { font-family: var(--mono); font-size: .75rem; color: var(--faint); }
+
+  /* ── Footer ─────────────────────────────── */
+  footer { margin-top: 28px; color: var(--faint); font-size: .76rem; text-align: center; line-height: 1.8; }
+  footer code { font-family: var(--mono); color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) { .seg, .pulse { transition: none; animation: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>
+        </svg>
+      </div>
+      <div>
+        <h1>HTTP IoT Dashboard</h1>
+        <p>Atividade Interativa · Redes de Computadores · sensor simulado via HTTP/1.1 sobre TCP</p>
+      </div>
+    </div>
+    <div class="status">
+      <span class="pulse off" id="dot"></span>
+      <span id="status-text">conectando…</span>
+    </div>
+  </header>
+
+  <!-- Stats rápidos -->
+  <div class="stats-row">
+    <div class="stat-box accent">
+      <div class="sk">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Requisições
+      </div>
+      <div class="sv"><span id="s-reqs">—</span></div>
+    </div>
+    <div class="stat-box">
+      <div class="sk">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Bytes / msg
+      </div>
+      <div class="sv"><span id="s-tam">—</span><u>B</u></div>
+    </div>
+    <div class="stat-box">
+      <div class="sk">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0z"/></svg>
+        Temperatura
+      </div>
+      <div class="sv"><span id="s-temp">—</span><u>°C</u></div>
+    </div>
+    <div class="stat-box">
+      <div class="sk">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7s6 6 6 10a6 6 0 0 1-12 0c0-4 6-10 6-10z"/></svg>
+        Umidade
+      </div>
+      <div class="sv"><span id="s-hum">—</span><u>%</u></div>
+    </div>
+  </div>
+
+  <!-- Leitura do sensor -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Última leitura <span>· sensor-http via POST /sensor</span></h2>
+      <span class="tag">HTTP/1.1 · TCP :8000</span>
+    </div>
+    <div id="sensor-body">
+      <div class="empty">Aguardando dados — rode <code>python http_client.py</code></div>
+    </div>
+  </section>
+
+  <!-- Anatomia da mensagem HTTP -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Anatomia da mensagem HTTP <span>· overhead vs payload</span></h2>
+      <span id="overhead-pct" class="tag">—</span>
+    </div>
+    <div class="anatomy">
+      <div>
+        <div class="bar-label">
+          <span>Requisição completa (headers + corpo)</span>
+          <strong><span id="http-total">—</span> B total</strong>
+        </div>
+        <div class="track" role="img" aria-label="Composição da mensagem HTTP">
+          <div class="seg payload" id="bar-payload" style="width:0%"></div>
+          <div class="seg overhead" id="bar-overhead" style="width:0%"></div>
+        </div>
+        <div class="bar-meta">
+          <span><i style="background:repeating-linear-gradient(45deg,#64748b,#64748b 4px,#55657c 4px,#55657c 8px)"></i>Payload JSON: <strong id="bm-payload">—</strong> B</span>
+          <span><i style="background:var(--accent)"></i>Headers HTTP: <strong id="bm-overhead">—</strong> B</span>
+        </div>
+      </div>
+
+      <!-- Anatomia textual da requisição -->
+      <div class="req-block" id="req-preview">
+        <span class="comment"># aguardando primeira leitura…</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gráfico de bytes acumulados -->
+  <section class="section">
+    <div class="chart-head">
+      <h2>Histórico <span>· último 90s</span></h2>
+      <div class="segmented" role="group" aria-label="Modo do gráfico">
+        <button id="m-bytes"  type="button" aria-pressed="true">Bytes acumulados</button>
+        <button id="m-sensor" type="button" aria-pressed="false">Temp / Umidade</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <svg class="chart-svg" id="chart-svg" role="img" aria-label="Gráfico de histórico HTTP"></svg>
+      <div class="chart-tip" id="chart-tip"></div>
+      <div class="chart-empty" id="chart-empty">Aguardando dados dos sensores…</div>
+    </div>
+    <div class="chart-legend" id="chart-legend"></div>
+  </section>
+
+  <!-- Endpoints disponíveis -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Endpoints do servidor <span>· FastAPI na porta 8000</span></h2>
+      <a href="/docs" target="_blank" class="tag" style="text-decoration:none;color:var(--accent)">Swagger UI →</a>
+    </div>
+    <table class="ep-table">
+      <thead>
+        <tr><th>Método</th><th>Endpoint</th><th>Descrição</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="method-pill pill-post">POST</span></td>
+          <td class="ep-path">/sensor</td>
+          <td class="ep-desc">Recebe leitura JSON do sensor IoT</td>
+          <td class="ep-status">201 Created</td>
+        </tr>
+        <tr>
+          <td><span class="method-pill pill-get">GET</span></td>
+          <td class="ep-path">/sensor/{id}</td>
+          <td class="ep-desc">Última leitura de um sensor específico</td>
+          <td class="ep-status">200 / 404</td>
+        </tr>
+        <tr>
+          <td><span class="method-pill pill-get">GET</span></td>
+          <td class="ep-path">/sensor</td>
+          <td class="ep-desc">Lista todos os sensores conhecidos</td>
+          <td class="ep-status">200 OK</td>
+        </tr>
+        <tr>
+          <td><span class="method-pill pill-get">GET</span></td>
+          <td class="ep-path">/api/stats</td>
+          <td class="ep-desc">Estatísticas de overhead em tempo real</td>
+          <td class="ep-status">200 OK</td>
+        </tr>
+        <tr>
+          <td><span class="method-pill pill-get">GET</span></td>
+          <td class="ep-path">/health</td>
+          <td class="ep-desc">Verificação de saúde do servidor</td>
+          <td class="ep-status">200 OK</td>
+        </tr>
+        <tr>
+          <td><span class="method-pill pill-get">GET</span></td>
+          <td class="ep-path">/</td>
+          <td class="ep-desc">Este dashboard</td>
+          <td class="ep-status">200 OK</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    Atualiza a cada 1s via <code>GET /api/stats</code> · protocolo <code>HTTP/1.1</code> sobre <code>TCP porta 8000</code><br/>
+    Overhead estimado reconstruindo os headers reais (ver <code>core/tamanhos.py</code>). Handshake TCP (3-way) não contado.
+  </footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
+const HIST_MAX = 90;
+
+const hist = { t: [], bytes: [], temp: [], hum: [] };
+let chartMode = "bytes";
+let hoverGuide = null, hoverCtx = null;
+
+const CSS = getComputedStyle(document.documentElement);
+const C = {
+  accent: CSS.getPropertyValue("--accent").trim() || "#3b82f6",
+  border: CSS.getPropertyValue("--border").trim() || "#1f2a3c",
+  faint:  CSS.getPropertyValue("--faint").trim()  || "#5a6b82",
+  muted:  CSS.getPropertyValue("--muted").trim()  || "#8595ab",
+  text:   CSS.getPropertyValue("--text").trim()   || "#e8eef7",
+  ok:     CSS.getPropertyValue("--ok").trim()     || "#22c55e",
+  s2:     CSS.getPropertyValue("--surface2").trim() || "#141c2b",
+};
+
+function tempoRel(ts) {
+  if (!ts) return "—";
+  const s = Math.max(0, Math.round(Date.now() / 1000 - ts));
+  if (s < 2) return "agora";
+  if (s < 60) return `há ${s}s`;
+  return `há ${Math.round(s / 60)}min`;
+}
+
+function fmtBytes(v) {
+  if (v == null) return "—";
+  if (v >= 1000) return (v / 1000).toFixed(1) + " kB";
+  return Math.round(v) + " B";
+}
+
+function updateReqPreview(leitura, payload_bytes, http_total) {
+  if (!leitura) return;
+  const body = JSON.stringify(leitura, null, null);
+  $("req-preview").innerHTML =
+    `<span class="method">POST</span> <span class="path">/sensor</span> <span class="version">HTTP/1.1</span>\n` +
+    `<span class="hkey">Host:</span> <span class="hval">127.0.0.1:8000</span>\n` +
+    `<span class="hkey">Content-Type:</span> <span class="hval">application/json</span>\n` +
+    `<span class="hkey">Content-Length:</span> <span class="hval">${payload_bytes}</span>` +
+    `  <span class="comment">← ${payload_bytes} B de dado útil</span>\n` +
+    `<span class="hkey">Accept:</span> <span class="hval">*/*</span>\n` +
+    `<span class="hkey">Connection:</span> <span class="hval">keep-alive</span>\n\n` +
+    `<span class="body">${body}</span>` +
+    `  <span class="comment">← payload JSON do sensor</span>\n\n` +
+    `<span class="comment">← servidor responde: HTTP/1.1 201 Created  (${http_total} B na requisição)</span>`;
+}
+
+async function tick() {
+  try {
+    const r = await fetch("/api/stats", { cache: "no-store" });
+    const d = await r.json();
+
+    $("dot").classList.remove("off");
+    $("status-text").textContent = "ao vivo · " + new Date().toLocaleTimeString("pt-BR");
+
+    const h = d.http;
+    const o = d.overhead;
+
+    // stats rápidos
+    if (h) {
+      $("s-reqs").textContent = h.mensagens ?? "—";
+      $("s-tam").textContent  = h.total_bytes ?? "—";
+      $("s-temp").textContent = h.leitura?.temperatura ?? "—";
+      $("s-hum").textContent  = h.leitura?.umidade ?? "—";
+    }
+
+    // anatomia
+    if (o) {
+      const total = o.http_total, over = o.http_overhead, pl = o.payload;
+      $("http-total").textContent   = total;
+      $("bm-payload").textContent   = pl;
+      $("bm-overhead").textContent  = over;
+      $("overhead-pct").textContent = `${o.overhead_pct}% overhead`;
+      $("bar-payload").style.width  = (100 * pl / total)   + "%";
+      $("bar-overhead").style.width = (100 * over / total) + "%";
+      if (h?.leitura) updateReqPreview(h.leitura, pl, total);
+    }
+
+    // card leitura
+    if (h?.leitura) {
+      const l = h.leitura;
+      $("sensor-body").innerHTML = `
+        <div class="readings">
+          <div class="reading">
+            <div class="rk">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0z"/></svg>
+              Temperatura
+            </div>
+            <div class="rv">${l.temperatura ?? "—"}<u>°C</u></div>
+          </div>
+          <div class="reading">
+            <div class="rk">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7s6 6 6 10a6 6 0 0 1-12 0c0-4 6-10 6-10z"/></svg>
+              Umidade
+            </div>
+            <div class="rv">${l.umidade ?? "—"}<u>%</u></div>
+          </div>
+        </div>
+        <div class="meta">
+          <div><span>Sensor ID</span><span>${l.id ?? "—"}</span></div>
+          <div><span>Mensagens</span><span>${h.mensagens ?? 0}</span></div>
+          <div><span>Tamanho msg</span><span>${h.total_bytes ?? "—"} B</span></div>
+          <div><span>Payload</span><span>${h.payload_bytes ?? "—"} B</span></div>
+          <div><span>Última atualização</span><span>${tempoRel(h.atualizado_em)}</span></div>
+          <div><span>Status HTTP</span><span class="tag-200">201 Created</span></div>
+        </div>`;
+    }
+
+    pushHistory(h);
+    renderChart();
+  } catch {
+    $("dot").classList.add("off");
+    $("status-text").textContent = "sem conexão";
+  }
+}
+
+function pushHistory(h) {
+  if (!h) return;
+  const bytes = h.mensagens && h.total_bytes ? h.mensagens * h.total_bytes : null;
+  if (bytes == null) return;
+  hist.t.push(Date.now());
+  hist.bytes.push(bytes);
+  hist.temp.push(h.leitura?.temperatura ?? null);
+  hist.hum.push(h.leitura?.umidade ?? null);
+  for (const k in hist) if (hist[k].length > HIST_MAX) hist[k].shift();
+}
+
+function setMode(m) {
+  chartMode = m;
+  $("m-bytes").setAttribute("aria-pressed", String(m === "bytes"));
+  $("m-sensor").setAttribute("aria-pressed", String(m === "sensor"));
+  const svg = $("chart-svg");
+  svg.classList.remove("fade"); void svg.offsetWidth; svg.classList.add("fade");
+  renderChart();
+}
+
+function renderChart() {
+  if (chartMode === "sensor") {
+    renderLines({
+      sub: "Temperatura (°C) lida pelo sensor HTTP ao longo do tempo.",
+      fmt: v => v.toFixed(1) + "°",
+      vals: hist.temp, color: C.accent, name: "Temperatura",
+      vals2: hist.hum, color2: "#a78bfa", name2: "Umidade (%)",
+    });
+  } else {
+    renderLines({
+      sub: "Bytes totais acumulados no fio (nº de mensagens × tamanho por mensagem).",
+      fmt: fmtBytes,
+      vals: hist.bytes, color: C.accent, name: "HTTP bytes",
+    });
+  }
+}
+
+function svgEl(tag, attrs, text) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  return e;
+}
+function relLabel(t) {
+  const s = Math.round((Date.now() - t) / 1000);
+  return s <= 1 ? "agora" : "-" + s + "s";
+}
+const lastNonNull = a => { for (let i = a.length-1; i >= 0; i--) if (a[i] != null) return a[i]; return null; };
+
+function renderLines({ fmt, vals, color, name, vals2, color2, name2 }) {
+  const n = hist.t.length;
+  const svg = $("chart-svg");
+  const empty = $("chart-empty");
+
+  if (n < 2) {
+    svg.style.display = "none"; empty.hidden = false;
+    $("chart-legend").innerHTML = "";
+    return;
+  }
+  svg.style.display = "block"; empty.hidden = true;
+
+  const w = svg.clientWidth || 680, h = 200;
+  const pL = 58, pR = 16, pT = 16, pB = 28;
+  svg.setAttribute("width", w); svg.setAttribute("height", h);
+  svg.replaceChildren();
+
+  const series = [{ vals, color, name }];
+  if (vals2) series.push({ vals: vals2, color: color2, name: name2, dash: "5 3" });
+
+  const allVals = series.flatMap(s => s.vals).filter(v => v != null);
+  let lo = Math.min(...allVals), hi = Math.max(...allVals);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const gap = (hi - lo) * 0.12; lo -= gap; hi += gap;
+  if (!vals2) lo = Math.min(lo, 0);
+
+  const X = i => pL + (w - pL - pR) * (i / (n - 1));
+  const Y = v => pT + (h - pT - pB) * (1 - (v - lo) / (hi - lo));
+
+  for (let g = 0; g <= 4; g++) {
+    const val = lo + (hi - lo) * g / 4, y = Y(val);
+    svg.appendChild(svgEl("line", { x1: pL, y1: y, x2: w - pR, y2: y, stroke: C.border, "stroke-width": 1, opacity: g === 0 ? 0.85 : 0.4 }));
+    svg.appendChild(svgEl("text", { x: pL - 9, y: y + 4, "text-anchor": "end", fill: C.faint, "font-size": 11 }, fmt(val)));
+  }
+  for (const i of [0, Math.floor((n-1)/2), n-1]) {
+    svg.appendChild(svgEl("text", { x: X(i), y: h - 7, "text-anchor": i === 0 ? "start" : i === n-1 ? "end" : "middle", fill: C.faint, "font-size": 11 }, relLabel(hist.t[i])));
+  }
+
+  for (const s of series) {
+    let d = "", on = false;
+    for (let i = 0; i < n; i++) {
+      const v = s.vals[i];
+      if (v == null) { on = false; continue; }
+      d += (on ? " L" : " M") + X(i).toFixed(1) + " " + Y(v).toFixed(1); on = true;
+    }
+    if (d) svg.appendChild(svgEl("path", { d, fill: "none", stroke: s.color, "stroke-width": 2.4, "stroke-dasharray": s.dash || "", "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    const li = lastNonNull(s.vals);
+    if (li != null) {
+      let idx = s.vals.length - 1;
+      while (idx >= 0 && s.vals[idx] == null) idx--;
+      if (idx >= 0) svg.appendChild(svgEl("circle", { cx: X(idx), cy: Y(li), r: 4, fill: s.color }));
+    }
+  }
+
+  hoverGuide = svgEl("line", { y1: pT, y2: h - pB, stroke: C.muted, "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 });
+  svg.appendChild(hoverGuide);
+  hoverCtx = { series, n, X, Y, fmt, times: hist.t.slice() };
+  svg.onmousemove = onHover; svg.onmouseleave = hideHover;
+
+  $("chart-legend").innerHTML = series.map(s => {
+    const cur = lastNonNull(s.vals);
+    const style = `border-top-color:${s.color};border-top-style:${s.dash ? "dashed" : "solid"}`;
+    return `<span class="li"><span class="swatch" style="${style}"></span>${s.name} <b>${cur != null ? fmt(cur) : "—"}</b></span>`;
+  }).join("");
+}
+
+function onHover(ev) {
+  if (!hoverCtx) return;
+  const { series, n, X, Y, fmt, times } = hoverCtx;
+  const r = ev.currentTarget.getBoundingClientRect();
+  const px = ev.clientX - r.left;
+  let bi = 0, bd = Infinity;
+  for (let i = 0; i < n; i++) { const dx = Math.abs(X(i) - px); if (dx < bd) { bd = dx; bi = i; } }
+  hoverGuide.setAttribute("x1", X(bi)); hoverGuide.setAttribute("x2", X(bi)); hoverGuide.setAttribute("opacity", 0.7);
+  const tip = $("chart-tip");
+  tip.innerHTML = `<b style="color:${C.faint}">${relLabel(times[bi])}</b><br>` +
+    series.map(s => `<span style="color:${s.color}">${s.name}</span> ${s.vals[bi] != null ? fmt(s.vals[bi]) : "—"}`).join("<br>");
+  const ys = series.map(s => s.vals[bi] != null ? Y(s.vals[bi]) : Infinity);
+  const yTop = Math.min(...ys);
+  tip.style.left = X(bi) + "px";
+  tip.style.top = (isFinite(yTop) ? yTop : 60) + "px";
+  tip.style.opacity = 1;
+}
+function hideHover() {
+  $("chart-tip").style.opacity = 0;
+  if (hoverGuide) hoverGuide.setAttribute("opacity", 0);
+}
+
+$("m-bytes").addEventListener("click", () => setMode("bytes"));
+$("m-sensor").addEventListener("click", () => setMode("sensor"));
+let _rt;
+window.addEventListener("resize", () => { clearTimeout(_rt); _rt = setTimeout(renderChart, 150); });
+
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

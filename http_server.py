@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="IoT HTTP Server — Redes de Computadores Grupo 8")
+app = FastAPI(title="IoT HTTP Server — Atividade Interativa")
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _STATIC = os.path.join(_DIR, "static")
@@ -100,7 +100,7 @@ if os.path.isdir(_STATIC):
 if __name__ == "__main__":
     import uvicorn
     print("=" * 54)
-    print("  Servidor HTTP IoT — Redes de Computadores Grupo 8")
+    print("  Servidor HTTP IoT — Atividade Interativa")
     print("  Dashboard: http://127.0.0.1:8000/")
     print("  Docs:      http://127.0.0.1:8000/docs")
     print("=" * 54)
