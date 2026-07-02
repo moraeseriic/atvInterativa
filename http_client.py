@@ -17,16 +17,20 @@ URL = "http://127.0.0.1:8000/sensor"
 _TENTATIVAS = 3
 
 
-async def main(n: int, intervalo: float):
+async def main(n: int, intervalo: float, continuo: bool):
     sensor = Sensor("sensor-http")
     async with httpx.AsyncClient(timeout=5.0) as client:
-        for i in range(n):
+        i = 0
+        while True:
+            if not continuo and i >= n:
+                break
             corpo = sensor.read_json()
             tam = tamanho_http(corpo)
+            label = f"#{i + 1} (∞)" if continuo else f"{i + 1}/{n}"
             for t in range(1, _TENTATIVAS + 1):
                 try:
                     r = await client.post(URL, content=corpo, headers={"Content-Type": "application/json"})
-                    logger.info("envio %d/%d | req~%dB | resp HTTP %d", i + 1, n, tam, r.status_code)
+                    logger.info("envio %s | req~%dB | resp HTTP %d", label, tam, r.status_code)
                     break
                 except httpx.ConnectError:
                     logger.warning("servidor indisponivel (tentativa %d/%d)", t, _TENTATIVAS)
@@ -35,7 +39,8 @@ async def main(n: int, intervalo: float):
                 except Exception as exc:
                     logger.error("erro inesperado: %s", exc)
                     break
-            if i < n - 1:
+            i += 1
+            if continuo or i < n:
                 await asyncio.sleep(intervalo)
 
 
@@ -43,5 +48,9 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--n", type=int, default=10)
     p.add_argument("--intervalo", type=float, default=1.0)
+    p.add_argument("--continuo", action="store_true", help="loop infinito até Ctrl+C")
     args = p.parse_args()
-    asyncio.run(main(args.n, args.intervalo))
+    try:
+        asyncio.run(main(args.n, args.intervalo, args.continuo))
+    except KeyboardInterrupt:
+        logger.info("encerrado pelo usuário")

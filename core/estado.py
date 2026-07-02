@@ -12,13 +12,14 @@ def _path(proto: str) -> str:
     return os.path.join(_DIR, f"_estado_{proto}.json")
 
 
-def gravar(protocolo: str, leitura: dict, total_bytes: int, payload_bytes: int, contador: int) -> None:
+def gravar(protocolo: str, leitura: dict, total_bytes: int, payload_bytes: int, contador: int, bytes_acumulados: int = 0) -> None:
     dados = {
         "protocolo": protocolo,
         "leitura": leitura,
         "total_bytes": total_bytes,
         "payload_bytes": payload_bytes,
         "mensagens": contador,
+        "bytes_acumulados": bytes_acumulados,
         "atualizado_em": time.time(),
     }
     tmp = _path(protocolo) + ".tmp"

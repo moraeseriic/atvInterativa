@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from core import estado
-from core.tamanhos import resumo_por_tamanho, tamanho_http
+from core.tamanhos import resumo_completo_por_tamanho, tamanho_http
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,7 +28,7 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 _STATIC = os.path.join(_DIR, "static")
 
 _ultimas_leituras: dict[str, dict] = {}
-_contador = {"posts": 0}
+_contador = {"posts": 0, "bytes_acumulados": 0}
 
 
 @app.post("/sensor", status_code=201)
@@ -38,14 +38,17 @@ async def receber_leitura(request: Request):
     dados = await request.json()
     sensor_id = dados.get("id", "desconhecido")
     _ultimas_leituras[sensor_id] = dados
+    tam = tamanho_http(corpo)
     _contador["posts"] += 1
-    logger.info("POST #%d de %s → %d B total", _contador["posts"], sensor_id, tamanho_http(corpo))
+    _contador["bytes_acumulados"] += tam
+    logger.info("POST #%d de %s → %d B (acum %d B)", _contador["posts"], sensor_id, tam, _contador["bytes_acumulados"])
     estado.gravar(
         "http",
         leitura=dados,
-        total_bytes=tamanho_http(corpo),
+        total_bytes=tam,
         payload_bytes=len(corpo),
         contador=_contador["posts"],
+        bytes_acumulados=_contador["bytes_acumulados"],
     )
     return {"status": "ok", "recebido": dados}
 
@@ -80,7 +83,7 @@ async def stats():
             n_payload = http_estado["payload_bytes"]
         return {
             "http": http_estado,
-            "overhead": resumo_por_tamanho(n_payload),
+            "overhead": resumo_completo_por_tamanho(n_payload),
         }
     except Exception as exc:
         logger.error("erro em /api/stats: %s", exc)

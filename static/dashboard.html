@@ -123,6 +123,7 @@
   .req-block .hval    { color: #e2e8f0; }
   .req-block .body    { color: var(--ok); }
   .req-block .comment { color: var(--faint); font-style: italic; }
+  .req-block .ok-status { color: var(--ok); font-weight: 700; }
   .tag-200 { background: rgba(34,197,94,.12); color: var(--ok); border: 1px solid rgba(34,197,94,.25); font-family: var(--mono); font-size: .72rem; padding: 3px 9px; border-radius: 999px; }
 
   /* ── Gráfico SVG ────────────────────────── */
@@ -208,7 +209,7 @@
     <div class="stat-box">
       <div class="sk">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        Bytes / msg
+        Roundtrip
       </div>
       <div class="sv"><span id="s-tam">—</span><u>B</u></div>
     </div>
@@ -261,9 +262,31 @@
         </div>
       </div>
 
-      <!-- Anatomia textual da requisição -->
+      <!-- Anatomia textual da requisição e resposta -->
       <div class="req-block" id="req-preview">
         <span class="comment"># aguardando primeira leitura…</span>
+      </div>
+
+      <!-- Resposta HTTP -->
+      <div>
+        <div class="bar-label">
+          <span>Resposta do servidor (headers + corpo JSON)</span>
+          <strong><span id="resp-total">—</span> B</strong>
+        </div>
+        <div class="track" role="img" aria-label="Composição da resposta HTTP">
+          <div class="seg payload" id="resp-bar-payload" style="width:0%"></div>
+          <div class="seg overhead" id="resp-bar-overhead" style="width:0%"></div>
+        </div>
+        <div class="bar-meta">
+          <span><i style="background:repeating-linear-gradient(45deg,#64748b,#64748b 4px,#55657c 4px,#55657c 8px)"></i>Corpo JSON: <strong id="resp-bm-payload">—</strong> B</span>
+          <span><i style="background:var(--accent)"></i>Headers HTTP: <strong id="resp-bm-overhead">—</strong> B</span>
+        </div>
+      </div>
+
+      <!-- Roundtrip summary -->
+      <div style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-size:.83rem;">
+        <span style="color:var(--muted)">Total ida e volta <span style="font-family:var(--mono);font-size:.75rem">(req + resp)</span></span>
+        <span style="font-family:var(--mono);font-weight:700;color:var(--accent)"><span id="roundtrip-total">—</span> B &nbsp;·&nbsp; <span id="roundtrip-pct">—</span></span>
       </div>
     </div>
   </section>
@@ -376,10 +399,13 @@ function fmtBytes(v) {
   return Math.round(v) + " B";
 }
 
-function updateReqPreview(leitura, payload_bytes, http_total) {
+function updateReqPreview(leitura, payload_bytes, http_total, o) {
   if (!leitura) return;
   const body = JSON.stringify(leitura, null, null);
+  const respBodyStr = JSON.stringify({"status":"ok","recebido":leitura});
+  const respBodyLen = new TextEncoder().encode(respBodyStr).length;
   $("req-preview").innerHTML =
+    `<span class="comment">── REQUISIÇÃO (${http_total} B) ─────────────────────────────</span>\n` +
     `<span class="method">POST</span> <span class="path">/sensor</span> <span class="version">HTTP/1.1</span>\n` +
     `<span class="hkey">Host:</span> <span class="hval">127.0.0.1:8000</span>\n` +
     `<span class="hkey">Content-Type:</span> <span class="hval">application/json</span>\n` +
@@ -389,7 +415,14 @@ function updateReqPreview(leitura, payload_bytes, http_total) {
     `<span class="hkey">Connection:</span> <span class="hval">keep-alive</span>\n\n` +
     `<span class="body">${body}</span>` +
     `  <span class="comment">← payload JSON do sensor</span>\n\n` +
-    `<span class="comment">← servidor responde: HTTP/1.1 201 Created  (${http_total} B na requisição)</span>`;
+    `<span class="comment">── RESPOSTA (${o?.resp_total ?? "?"} B) ──────────────────────────────</span>\n` +
+    `<span class="version">HTTP/1.1</span> <span class="ok-status">201 Created</span>\n` +
+    `<span class="hkey">date:</span> <span class="hval">${new Date().toUTCString()}</span>\n` +
+    `<span class="hkey">server:</span> <span class="hval">uvicorn</span>\n` +
+    `<span class="hkey">content-length:</span> <span class="hval">${respBodyLen}</span>\n` +
+    `<span class="hkey">content-type:</span> <span class="hval">application/json</span>\n\n` +
+    `<span class="body">${respBodyStr}</span>` +
+    `  <span class="comment">← corpo da resposta</span>`;
 }
 
 async function tick() {
@@ -406,7 +439,6 @@ async function tick() {
     // stats rápidos
     if (h) {
       $("s-reqs").textContent = h.mensagens ?? "—";
-      $("s-tam").textContent  = h.total_bytes ?? "—";
       $("s-temp").textContent = h.leitura?.temperatura ?? "—";
       $("s-hum").textContent  = h.leitura?.umidade ?? "—";
     }
@@ -417,10 +449,20 @@ async function tick() {
       $("http-total").textContent   = total;
       $("bm-payload").textContent   = pl;
       $("bm-overhead").textContent  = over;
-      $("overhead-pct").textContent = `${o.overhead_pct}% overhead`;
+      $("overhead-pct").textContent = `${o.overhead_pct}% req`;
       $("bar-payload").style.width  = (100 * pl / total)   + "%";
       $("bar-overhead").style.width = (100 * over / total) + "%";
-      if (h?.leitura) updateReqPreview(h.leitura, pl, total);
+      if (h?.leitura) updateReqPreview(h.leitura, pl, total, o);
+
+      $("s-tam").textContent             = o.roundtrip;
+      $("resp-total").textContent        = o.resp_total;
+      $("resp-bm-payload").textContent   = o.resp_payload;
+      $("resp-bm-overhead").textContent  = o.resp_overhead;
+      const rT = o.resp_total;
+      $("resp-bar-payload").style.width  = (100 * o.resp_payload / rT) + "%";
+      $("resp-bar-overhead").style.width = (100 * o.resp_overhead / rT) + "%";
+      $("roundtrip-total").textContent   = o.roundtrip;
+      $("roundtrip-pct").textContent     = `${o.roundtrip_overhead_pct}% overhead`;
     }
 
     // card leitura
@@ -463,7 +505,7 @@ async function tick() {
 
 function pushHistory(h) {
   if (!h) return;
-  const bytes = h.mensagens && h.total_bytes ? h.mensagens * h.total_bytes : null;
+  const bytes = h.bytes_acumulados ?? null;
   if (bytes == null) return;
   hist.t.push(Date.now());
   hist.bytes.push(bytes);
