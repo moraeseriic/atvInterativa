@@ -7,6 +7,7 @@ Rodar: python http_server.py
 
 import logging
 import os
+import time
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -29,11 +30,15 @@ _STATIC = os.path.join(_DIR, "static")
 
 _ultimas_leituras: dict[str, dict] = {}
 _contador = {"posts": 0, "bytes_acumulados": 0}
+_primeiro_post_em: float | None = None
+_metricas_rtt: list[float] = []
+_MAX_RTT = 100
 
 
 @app.post("/sensor", status_code=201)
 async def receber_leitura(request: Request):
     """Recebe leitura JSON de um sensor IoT via HTTP POST."""
+    global _primeiro_post_em
     corpo = await request.body()
     dados = await request.json()
     sensor_id = dados.get("id", "desconhecido")
@@ -41,6 +46,8 @@ async def receber_leitura(request: Request):
     tam = tamanho_http(corpo)
     _contador["posts"] += 1
     _contador["bytes_acumulados"] += tam
+    if _primeiro_post_em is None:
+        _primeiro_post_em = time.time()
     logger.info("POST #%d de %s → %d B (acum %d B)", _contador["posts"], sensor_id, tam, _contador["bytes_acumulados"])
     estado.gravar(
         "http",
@@ -51,6 +58,18 @@ async def receber_leitura(request: Request):
         bytes_acumulados=_contador["bytes_acumulados"],
     )
     return {"status": "ok", "recebido": dados}
+
+
+@app.post("/api/metricas")
+async def receber_metricas(request: Request):
+    """Recebe métricas de desempenho do cliente (RTT medido no cliente)."""
+    dados = await request.json()
+    rtt = dados.get("rtt_ms")
+    if isinstance(rtt, (int, float)) and rtt > 0:
+        _metricas_rtt.append(round(rtt, 2))
+        if len(_metricas_rtt) > _MAX_RTT:
+            _metricas_rtt.pop(0)
+    return {"ok": True}
 
 
 @app.get("/sensor/{sensor_id}")
@@ -75,15 +94,40 @@ async def health():
 
 @app.get("/api/stats")
 async def stats():
-    """Retorna estatísticas HTTP em tempo real (leitura atual + overhead)."""
+    """Retorna estatísticas HTTP em tempo real (overhead + RTT + throughput + sensores)."""
     try:
         http_estado = estado.ler("http")
         n_payload = 68
         if http_estado and http_estado.get("payload_bytes", 0) > 0:
             n_payload = http_estado["payload_bytes"]
+
+        msgs_por_seg = None
+        bytes_por_seg = None
+        if _primeiro_post_em is not None:
+            elapsed = time.time() - _primeiro_post_em
+            if elapsed > 0:
+                msgs_por_seg = round(_contador["posts"] / elapsed, 2)
+                bytes_por_seg = round(_contador["bytes_acumulados"] / elapsed, 1)
+
+        rtt_stats = None
+        if _metricas_rtt:
+            rtt_stats = {
+                "atual": _metricas_rtt[-1],
+                "media": round(sum(_metricas_rtt) / len(_metricas_rtt), 2),
+                "min": round(min(_metricas_rtt), 2),
+                "max": round(max(_metricas_rtt), 2),
+                "amostras": len(_metricas_rtt),
+            }
+
         return {
-            "http": http_estado,
+            "http": {
+                **(http_estado or {}),
+                "msgs_por_seg": msgs_por_seg,
+                "bytes_por_seg": bytes_por_seg,
+            },
             "overhead": resumo_completo_por_tamanho(n_payload),
+            "rtt": rtt_stats,
+            "sensores": _ultimas_leituras,
         }
     except Exception as exc:
         logger.error("erro em /api/stats: %s", exc)
