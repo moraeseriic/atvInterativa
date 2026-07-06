@@ -396,6 +396,19 @@
           <div><span>Headers resp</span><span id="sim-resp-over">—</span></div>
           <div><span>Overhead só headers</span><span id="sim-headers-pct">—</span></div>
         </div>
+        <div class="sim-stats" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+          <div style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <span style="font-size:.78rem;color:var(--muted)">3-way handshake TCP <em style="font-style:normal;color:var(--faint)">(keep-alive amortiza)</em></span>
+            <span style="display:flex;align-items:center;gap:6px;">
+              <label for="sim-sessao" style="font-size:.7rem;color:var(--faint)">msgs/sessão</label>
+              <input type="number" id="sim-sessao" min="1" max="500" value="10"
+                style="width:52px;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 6px;font-size:.75rem;font-family:var(--mono);text-align:center;">
+            </span>
+          </div>
+          <div><span>Handshake total</span><span id="sim-hs-total">—</span></div>
+          <div><span>Custo amortizado/msg</span><span id="sim-hs-amort">—</span></div>
+          <div style="grid-column:1/-1"><span>Overhead c/ handshake</span><span id="sim-hs-pct">—</span></div>
+        </div>
       </div>
       <div>
         <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px;">
@@ -758,7 +771,7 @@ function hideHover() {
 }
 
 // ── Simulador de overhead ──────────────────────────────────────────────────
-function simOverhead(n) {
+function simOverhead(n, sessaoMsgs = 10) {
   const reqLinha   = "POST /sensor HTTP/1.1\r\n";
   const reqHeaders = `Host: 127.0.0.1:8000\r\nContent-Type: application/json\r\nContent-Length: ${n}\r\nAccept: */*\r\nConnection: keep-alive\r\n\r\n`;
   const reqTotal   = reqLinha.length + reqHeaders.length + n;
@@ -772,9 +785,18 @@ function simOverhead(n) {
 
   const roundtrip = reqTotal + respTotal;
   const totalOver = reqOver + respOver;
+
+  // TCP 3-way handshake: SYN(60B) + SYN-ACK(60B) + ACK(40B) = 160B
+  // keep-alive amortiza esse custo entre todas as mensagens da sessão
+  const hsTotal        = 160;
+  const hsAmort        = +(hsTotal / sessaoMsgs).toFixed(1);
+  const sessaoBytes    = sessaoMsgs * roundtrip + hsTotal;
+  const realPctComHS   = +(100 * (sessaoBytes - sessaoMsgs * n) / sessaoBytes).toFixed(1);
+
   return { n, reqTotal, reqOver, respTotal, respOver, roundtrip, totalOver,
-    pct:     +(100 * totalOver / roundtrip).toFixed(1),         // só headers
-    realPct: +(100 * (roundtrip - n) / roundtrip).toFixed(1) }; // tudo exceto dado útil
+    pct:          +(100 * totalOver / roundtrip).toFixed(1),
+    realPct:      +(100 * (roundtrip - n) / roundtrip).toFixed(1),
+    hsTotal, hsAmort, realPctComHS };
 }
 
 function renderSimCurve() {
@@ -814,7 +836,8 @@ function renderSimCurve() {
 
 function updateSim() {
   const n = parseInt($("sim-slider").value);
-  const s = simOverhead(n);
+  const sessaoMsgs = Math.max(1, parseInt($("sim-sessao").value) || 10);
+  const s = simOverhead(n, sessaoMsgs);
   const progress = ((n - 10) / 1990 * 100).toFixed(1);
   $("sim-slider").style.setProperty("--progress", progress + "%");
   $("sim-n").textContent         = n;
@@ -827,12 +850,16 @@ function updateSim() {
   $("sim-req-over").textContent      = s.reqOver + " B";
   $("sim-resp-over").textContent     = s.respOver + " B";
   $("sim-headers-pct").textContent   = s.pct + "%";
+  $("sim-hs-total").textContent  = s.hsTotal + " B";
+  $("sim-hs-amort").textContent  = s.hsAmort + " B";
+  $("sim-hs-pct").textContent    = s.realPctComHS + "%";
   $("sim-bar-payload").style.width  = (100 * n / s.roundtrip) + "%";
   $("sim-bar-overhead").style.width = (100 * (s.roundtrip - n) / s.roundtrip) + "%";
   renderSimCurve();
 }
 
 $("sim-slider").addEventListener("input", updateSim);
+$("sim-sessao").addEventListener("input", updateSim);
 $("tab-req").addEventListener("click",  () => setPreviewTab("req"));
 $("tab-resp").addEventListener("click", () => setPreviewTab("resp"));
 $("m-bytes").addEventListener("click",  () => setMode("bytes"));

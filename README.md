@@ -76,6 +76,29 @@ Cliente           Servidor
 
 O cliente usa `Connection: keep-alive` — handshake acontece **uma vez** por sessão; requisições seguintes reutilizam a conexão TCP.
 
+#### Custo do handshake e amortização
+
+Cada pacote TCP carrega um header IP + TCP (~40 B fixos) mais dados opcionais:
+
+| Pacote | Tamanho típico | Conteúdo |
+|---|---|---|
+| SYN | ~60 B | Header TCP com flag SYN + opções MSS/SACK |
+| SYN-ACK | ~60 B | Confirmação do servidor |
+| ACK | ~40 B | Confirmação final (sem dados) |
+| **Total handshake** | **~160 B** | — |
+
+Com keep-alive, esse custo fixo de 160 B é **dividido** pelo número de mensagens da sessão:
+
+```
+overhead_hs_por_msg = 160 / N
+
+N = 1   → +160 B/msg  (conexão nova por requisição — custo máximo)
+N = 10  → +16 B/msg
+N = 100 → +1.6 B/msg  (quase desprezível)
+```
+
+O **simulador de overhead** no dashboard inclui um campo "msgs/sessão" que permite variar N e ver como o custo amortizado do handshake se soma ao overhead total de headers.
+
 ### Estrutura de uma requisição HTTP
 
 Cada leitura do sensor gera esta mensagem:
