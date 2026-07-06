@@ -462,7 +462,7 @@
 
   <footer>
     Atualiza a cada 1s via <code>GET /api/stats</code> · protocolo <code>HTTP/1.1</code> sobre <code>TCP porta 8000</code><br/>
-    Overhead estimado reconstruindo os headers reais (ver <code>core/tamanhos.py</code>). Handshake TCP (3-way) não contado.
+    Overhead calculado reconstruindo os headers reais (ver <code>core/tamanhos.py</code>). Handshake TCP (3-way, ~160 B) amortizado no simulador.
   </footer>
 </div>
 
