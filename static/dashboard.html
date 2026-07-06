@@ -116,6 +116,19 @@
   .bar-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px; font-size: .76rem; color: var(--muted); font-family: var(--mono); }
   .bar-meta i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 
+  /* ── Barras lado a lado ─────────────────── */
+  .bars-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 600px) { .bars-grid { grid-template-columns: 1fr; } }
+  .bar-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .bar-card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; font-size: .78rem; color: var(--muted); }
+  .bar-card-head strong { color: var(--text); font-family: var(--mono); }
+
+  /* ── Preview tabs ───────────────────────── */
+  .preview-tabs { display: inline-flex; background: #0a1018; border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 2px; margin-bottom: 10px; }
+  .preview-tabs button { font-family: var(--mono); font-size: .73rem; color: var(--muted); background: transparent; border: 0; border-radius: 6px; padding: 6px 14px; cursor: pointer; transition: color .15s, background .15s; }
+  .preview-tabs button:hover { color: var(--text); }
+  .preview-tabs button[aria-pressed="true"] { color: var(--text); background: var(--surface2); box-shadow: inset 0 0 0 1px var(--border); }
+
   /* ── Req/resp preview ───────────────────── */
   .req-block {
     background: #070c14; border: 1px solid var(--border); border-radius: 12px;
@@ -293,43 +306,53 @@
       <span id="overhead-pct" class="tag">—</span>
     </div>
     <div class="anatomy">
-      <div>
-        <div class="bar-label">
-          <span>Requisição completa (headers + corpo)</span>
-          <strong><span id="http-total">—</span> B total</strong>
+      <!-- Duas barras lado a lado -->
+      <div class="bars-grid">
+        <div class="bar-card">
+          <div class="bar-card-head">
+            <span>← Requisição</span>
+            <strong><span id="http-total">—</span> B</strong>
+          </div>
+          <div class="track" role="img" aria-label="Composição da requisição HTTP">
+            <div class="seg payload"  id="bar-payload"  style="width:0%"></div>
+            <div class="seg overhead" id="bar-overhead" style="width:0%"></div>
+          </div>
+          <div class="bar-meta">
+            <span><i style="background:repeating-linear-gradient(45deg,#64748b,#64748b 4px,#55657c 4px,#55657c 8px)"></i>JSON: <strong id="bm-payload">—</strong> B</span>
+            <span><i style="background:var(--accent)"></i>Headers: <strong id="bm-overhead">—</strong> B</span>
+          </div>
         </div>
-        <div class="track" role="img" aria-label="Composição da mensagem HTTP">
-          <div class="seg payload"  id="bar-payload"  style="width:0%"></div>
-          <div class="seg overhead" id="bar-overhead" style="width:0%"></div>
-        </div>
-        <div class="bar-meta">
-          <span><i style="background:repeating-linear-gradient(45deg,#64748b,#64748b 4px,#55657c 4px,#55657c 8px)"></i>Payload JSON: <strong id="bm-payload">—</strong> B</span>
-          <span><i style="background:var(--accent)"></i>Headers HTTP: <strong id="bm-overhead">—</strong> B</span>
-        </div>
-      </div>
-
-      <div class="req-block" id="req-preview">
-        <span class="comment"># aguardando primeira leitura…</span>
-      </div>
-
-      <div>
-        <div class="bar-label">
-          <span>Resposta do servidor (headers + corpo JSON)</span>
-          <strong><span id="resp-total">—</span> B</strong>
-        </div>
-        <div class="track" role="img" aria-label="Composição da resposta HTTP">
-          <div class="seg payload"  id="resp-bar-payload"  style="width:0%"></div>
-          <div class="seg overhead" id="resp-bar-overhead" style="width:0%"></div>
-        </div>
-        <div class="bar-meta">
-          <span><i style="background:repeating-linear-gradient(45deg,#64748b,#64748b 4px,#55657c 4px,#55657c 8px)"></i>Corpo JSON: <strong id="resp-bm-payload">—</strong> B</span>
-          <span><i style="background:var(--accent)"></i>Headers HTTP: <strong id="resp-bm-overhead">—</strong> B</span>
+        <div class="bar-card">
+          <div class="bar-card-head">
+            <span>Resposta →</span>
+            <strong><span id="resp-total">—</span> B</strong>
+          </div>
+          <div class="track" role="img" aria-label="Composição da resposta HTTP">
+            <div class="seg payload"  id="resp-bar-payload"  style="width:0%"></div>
+            <div class="seg overhead" id="resp-bar-overhead" style="width:0%"></div>
+          </div>
+          <div class="bar-meta">
+            <span><i style="background:repeating-linear-gradient(45deg,#64748b,#64748b 4px,#55657c 4px,#55657c 8px)"></i>JSON: <strong id="resp-bm-payload">—</strong> B</span>
+            <span><i style="background:var(--accent)"></i>Headers: <strong id="resp-bm-overhead">—</strong> B</span>
+          </div>
         </div>
       </div>
 
+      <!-- Roundtrip summary -->
       <div style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-size:.83rem;">
         <span style="color:var(--muted)">Total ida e volta <span style="font-family:var(--mono);font-size:.75rem">(req + resp)</span></span>
         <span style="font-family:var(--mono);font-weight:700;color:var(--accent)"><span id="roundtrip-total">—</span> B &nbsp;·&nbsp; <span id="roundtrip-pct">—</span></span>
+      </div>
+
+      <!-- Preview com abas -->
+      <div>
+        <div class="preview-tabs">
+          <button id="tab-req" type="button" aria-pressed="true">← Requisição</button>
+          <button id="tab-resp" type="button" aria-pressed="false">Resposta →</button>
+        </div>
+        <div class="req-block" id="req-preview">
+          <span class="comment"># aguardando primeira leitura…</span>
+        </div>
       </div>
     </div>
   </section>
@@ -473,27 +496,41 @@ function rttBoxClass(ms) {
   return "red-box";
 }
 
+let _reqHtml = null, _respHtml = null;
+
 function updateReqPreview(leitura, payload_bytes, http_total, o) {
   if (!leitura) return;
   const body = JSON.stringify(leitura, null, null);
   const respBodyStr = JSON.stringify({"status":"ok","recebido":leitura});
   const respBodyLen = new TextEncoder().encode(respBodyStr).length;
-  $("req-preview").innerHTML =
-    `<span class="comment">── REQUISIÇÃO (${http_total} B) ─────────────────────────────</span>\n` +
+  _reqHtml =
     `<span class="method">POST</span> <span class="path">/sensor</span> <span class="version">HTTP/1.1</span>\n` +
     `<span class="hkey">Host:</span> <span class="hval">127.0.0.1:8000</span>\n` +
     `<span class="hkey">Content-Type:</span> <span class="hval">application/json</span>\n` +
     `<span class="hkey">Content-Length:</span> <span class="hval">${payload_bytes}</span>  <span class="comment">← ${payload_bytes} B de dado útil</span>\n` +
     `<span class="hkey">Accept:</span> <span class="hval">*/*</span>\n` +
     `<span class="hkey">Connection:</span> <span class="hval">keep-alive</span>\n\n` +
-    `<span class="body">${body}</span>  <span class="comment">← payload JSON do sensor</span>\n\n` +
-    `<span class="comment">── RESPOSTA (${o?.resp_total ?? "?"} B) ──────────────────────────────</span>\n` +
+    `<span class="body">${body}</span>  <span class="comment">← payload JSON do sensor</span>`;
+  _respHtml =
     `<span class="version">HTTP/1.1</span> <span class="ok-status">201 Created</span>\n` +
     `<span class="hkey">date:</span> <span class="hval">${new Date().toUTCString()}</span>\n` +
     `<span class="hkey">server:</span> <span class="hval">uvicorn</span>\n` +
     `<span class="hkey">content-length:</span> <span class="hval">${respBodyLen}</span>\n` +
     `<span class="hkey">content-type:</span> <span class="hval">application/json</span>\n\n` +
     `<span class="body">${respBodyStr}</span>  <span class="comment">← corpo da resposta</span>`;
+  renderPreviewTab();
+}
+
+function renderPreviewTab() {
+  const isReq = $("tab-req").getAttribute("aria-pressed") === "true";
+  $("req-preview").innerHTML = (isReq ? _reqHtml : _respHtml)
+    ?? '<span class="comment"># aguardando primeira leitura…</span>';
+}
+
+function setPreviewTab(tab) {
+  $("tab-req").setAttribute("aria-pressed",  String(tab === "req"));
+  $("tab-resp").setAttribute("aria-pressed", String(tab === "resp"));
+  renderPreviewTab();
 }
 
 async function tick() {
@@ -532,7 +569,7 @@ async function tick() {
       $("http-total").textContent    = total;
       $("bm-payload").textContent    = pl;
       $("bm-overhead").textContent   = over;
-      $("overhead-pct").textContent  = `${o.overhead_pct}% req`;
+      $("overhead-pct").textContent  = `${o.roundtrip_overhead_pct}% roundtrip`;
       $("bar-payload").style.width   = (100 * pl / total) + "%";
       $("bar-overhead").style.width  = (100 * over / total) + "%";
       if (h?.leitura) updateReqPreview(h.leitura, pl, total, o);
@@ -793,6 +830,8 @@ function updateSim() {
 }
 
 $("sim-slider").addEventListener("input", updateSim);
+$("tab-req").addEventListener("click",  () => setPreviewTab("req"));
+$("tab-resp").addEventListener("click", () => setPreviewTab("resp"));
 $("m-bytes").addEventListener("click",  () => setMode("bytes"));
 $("m-sensor").addEventListener("click", () => setMode("sensor"));
 $("m-rtt").addEventListener("click",    () => setMode("rtt"));
